@@ -1,4 +1,4 @@
-#define F_CPU 16000000UL   // muuta jos kide ei ole 16 MHz
+#define F_CPU 8000000UL   // 8 MHz
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -70,6 +70,7 @@ void timer1_set_frequency(uint16_t freq_hz)
 	cli();
 	OCR1A = ocr;
 	SREG = sreg;
+	sei();
 }
 
 
@@ -82,7 +83,8 @@ void adc_init(void)
 
 	// ADC päälle, jakaja 128 (125 kHz ADC clock @ 16 MHz)
 	ADCSRA = (1 << ADEN) |
-	(1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+	(1 << ADPS2) | (1 << ADPS1);
+	ADCSRA &= ~(1 << ADPS0);
 }
 
 uint16_t adc_read(void)
@@ -102,7 +104,7 @@ ISR(TIMER1_COMPA_vect)
 
 	switch (waveform) {
 		case 0:
-		value = sine_table[sample_index];
+		value = square_table[sample_index];
 		break;
 		case 1:
 		value = square_table[sample_index];
@@ -121,13 +123,13 @@ ISR(TIMER1_COMPA_vect)
 }
 
 // INT0: nappi vaihtaa aaltomuodon
-ISR(INT0_vect)
+ISR(INT1_vect)
 {
 	waveform++;
 	if (waveform > 2) {
 		waveform = 0;
 	}
-	// sample_index = 0; // halutessa voi nollata
+	sample_index = 0; // halutessa voi nollata
 }
 
 
@@ -138,9 +140,10 @@ int main(void)
 	// PB0..PB5 DAC-lähdöiksi
 	DDRB |= DAC_MASK;
 
-	// Nappi SW1: PD2 / INT0, sisäinen pull-up
-	DDRD &= ~(1 << DDD2);
-	PORTD |= (1 << PORTD2);
+	// Nappi SW1: PD2 / INT1, sisäinen pull-up
+	MCUCR &= ~(1 << PUD);
+	DDRD &= ~(1 << DDD3);
+	PORTD |= (1 << PORTD3);
 
 	// Timer1 CTC, prescaler 1
 	TCCR1A = 0;
@@ -149,12 +152,10 @@ int main(void)
 	TIMSK1 = (1 << OCIE1A);        // OCR1A keskeytys päälle
 
 	// INT0 laskeva reuna
-	EICRA = (1 << ISC01);          // ISC01=1, ISC00=0 → falling edge
-	EIMSK = (1 << INT0);
+	EICRA = (1 << ISC11);          // ISC01=1, ISC00=0 → falling edge
+	EIMSK = (1 << INT1);
 
 	adc_init();
-
-	sei();
 
 	while (1) {
 		// luetaan potikka ja säädetään taajuus
