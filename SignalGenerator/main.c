@@ -87,7 +87,6 @@ const uint8_t triangle_table[TABLE_SIZE] PROGMEM = {
 volatile uint8_t waveform = WAVEFORM_SINE;   /* Current waveform type */
 volatile uint8_t sample_index = 0;           /* Current sample index in table */
 volatile uint8_t sleep_flag = 0;             /* Flag to enter sleep mode */
-volatile uint8_t wakeup_flag = 0;            /* Flag indicating wake-up occurred */
 volatile uint8_t waveform_changed = 0;       /* Flag for LED update */
 
 /* Debounce variables */
@@ -352,18 +351,24 @@ ISR(TIMER2_COMPA_vect)
 	
 	/* Advance to next sample */
 	sample_index++;
-	/* No need to check for overflow - 8-bit wraps automatically with 256 samples */
+	/* 
+	 * TABLE_SIZE must be 256 for automatic 8-bit wraparound to work correctly.
+	 * The 8-bit sample_index overflows from 255 to 0, matching the 256-sample table.
+	 */
 }
 
 /**
  * @brief INT0 ISR - Wake-up button (SW1)
+ * 
+ * When pressed while awake, sets flag to enter sleep mode.
+ * When in sleep mode, this interrupt wakes the MCU.
  */
 ISR(INT0_vect)
 {
 	/* Simple debounce: ignore if recently triggered */
 	if (btn_wakeup_debounce == 0) {
 		btn_wakeup_debounce = DEBOUNCE_SAMPLES;
-		wakeup_flag = 1;
+		sleep_flag = 1;  /* Request sleep mode entry */
 	}
 }
 
@@ -419,16 +424,6 @@ int main(void)
 		uint32_t freq = FREQ_MIN + ((uint32_t)adc_val * (FREQ_MAX - FREQ_MIN) / 1023);
 		set_sample_rate((uint16_t)freq);
 		
-		/* Handle debounce counters (decrement each loop iteration) */
-		if (btn_select_debounce > 0) {
-			btn_select_debounce--;
-			_delay_ms(10);
-		}
-		if (btn_wakeup_debounce > 0) {
-			btn_wakeup_debounce--;
-			_delay_ms(10);
-		}
-		
 		/* Update LED if waveform changed */
 		if (waveform_changed) {
 			waveform_changed = 0;
@@ -441,7 +436,15 @@ int main(void)
 			enter_sleep();
 		}
 		
-		/* Small delay to prevent excessive ADC readings */
+		/* Handle debounce counters - decrement each loop iteration */
+		if (btn_select_debounce > 0) {
+			btn_select_debounce--;
+		}
+		if (btn_wakeup_debounce > 0) {
+			btn_wakeup_debounce--;
+		}
+		
+		/* Fixed loop delay for consistent timing (~10ms per iteration) */
 		_delay_ms(10);
 	}
 	
