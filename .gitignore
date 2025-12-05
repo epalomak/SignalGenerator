@@ -1,0 +1,24 @@
+# Build artifacts
+*.o
+*.d
+*.elf
+*.hex
+*.eep
+*.lss
+*.map
+*.srec
+
+# Temporary files
+*.tmp
+*~
+
+# IDE files (optional to keep)
+.vs/
+
+# Backup files
+*.bak
+*.orig
+
+# OS-specific files
+.DS_Store
+Thumbs.db

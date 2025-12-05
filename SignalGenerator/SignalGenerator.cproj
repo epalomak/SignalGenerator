@@ -140,5 +140,10 @@
       <SubType>compile</SubType>
     </Compile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="config.h">
+      <SubType>compile</SubType>
+    </None>
+  </ItemGroup>
   <Import Project="$(AVRSTUDIO_EXE_PATH)\\Vs\\Compiler.targets" />
 </Project>
